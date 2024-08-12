@@ -26,20 +26,32 @@ func main() {
 
 // https://leetcode.com/problems/sign-of-the-product-of-an-array
 func arraySign(nums []int) int {
-	// write code here
+	countNegatives := 0
 
-	return 1 // if positive
-	// return -1 // if negative
+	for _, num := range nums {
+			if num == 0 {
+					return 0
+			}
+			if num < 0 {
+					countNegatives++
+			}
+	}
+
+	if countNegatives%2 != 0 {
+			return -1
+	}
+	return 1
 }
 
+
 // https://leetcode.com/problems/valid-anagram
-func isAnagram(s string, t string) bool {
+func isAnagram() bool {
 	// write code here
 	return false
 }
 
 // https://leetcode.com/problems/find-the-difference
-func findTheDifference(s string, t string) byte {
+func findTheDifference(_ string, t string) byte {
 	// write code here
 	b := byte('a')
 	return b
@@ -123,13 +135,13 @@ func tesDeck() {
 	for _, c := range top5Cards {
 		fmt.Println(c.ToString())
 	}
-	fmt.Println("---\n")
+	fmt.Println("---")
 
 	fmt.Println(deck.PeekCardAtIndex(12).ToString()) // Queen Spade
 	fmt.Println(deck.PeekCardAtIndex(13).ToString()) // King Spade
 	fmt.Println(deck.PeekCardAtIndex(14).ToString()) // Ace Heart
 	fmt.Println(deck.PeekCardAtIndex(15).ToString()) // 2 Heart
-	fmt.Println("---\n")
+	fmt.Println("---")
 
 	deck.Shuffle()
 	top5Cards = deck.PeekTop(10)
@@ -137,7 +149,7 @@ func tesDeck() {
 		fmt.Println(c.ToString())
 	}
 
-	fmt.Println("---\n")
+	fmt.Println("---")
 	deck.New()
 	deck.Cut(5)
 	bottomCards := deck.PeekBottom(10)
