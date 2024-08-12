@@ -31,7 +31,6 @@ func main() {
 
 // https://leetcode.com/problems/sign-of-the-product-of-an-array
 func arraySign(nums []int) int {
-<<<<<<< HEAD:basic_go/assignments/main.go
 	// write code here
 	sign := 1
 	for _, num := range nums {
@@ -44,28 +43,11 @@ func arraySign(nums []int) int {
 	}
 
 	return sign
-=======
-	countNegatives := 0
-
-	for _, num := range nums {
-			if num == 0 {
-					return 0
-			}
-			if num < 0 {
-					countNegatives++
-			}
-	}
-
-	if countNegatives%2 != 0 {
-			return -1
-	}
-	return 1
->>>>>>> b3e9bff036f3177ee65314059ffa2461baf666c9:assignments/main.go
 }
 
 
 // https://leetcode.com/problems/valid-anagram
-func isAnagram() bool {
+func isAnagram(s string, t string) bool {
 	// write code here
 	if len(s) != len(t) {
 		return false
@@ -93,13 +75,8 @@ func isAnagram() bool {
 	return true
 }
 
-<<<<<<< HEAD:basic_go/assignments/main.go
 	// https://leetcode.com/problems/find-the-difference
 func findTheDifference(s string, t string) byte {
-=======
-// https://leetcode.com/problems/find-the-difference
-func findTheDifference(_ string, t string) byte {
->>>>>>> b3e9bff036f3177ee65314059ffa2461baf666c9:assignments/main.go
 	// write code here
 	var result rune
 
