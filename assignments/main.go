@@ -1,31 +1,50 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"math/rand"
+	"sort"
+	"time"
+)
 
 func main() {
 	fmt.Println("hello world")
 
-	// arraySign([]int{2, 1})                    // 1
-	// arraySign([]int{-2, 1})                   // -1
-	// arraySign([]int{-1, -2, -3, -4, 3, 2, 1}) // 1
+	fmt.Println(arraySign([]int{2, 1}))                    // 1
+	fmt.Println(arraySign([]int{-2, 1}))                   // -1
+	fmt.Println(arraySign([]int{-1, -2, -3, -4, 3, 2, 1})) // 1
 
-	// isAnagram("anak", "kana") // true
-	// isAnagram("anak", "mana") // false
-	// isAnagram("anagram", "managra") // true
+	fmt.Println(isAnagram("anak", "kana"))    // true
+	fmt.Println(isAnagram("anak", "mana"))    // false
+	fmt.Println(isAnagram("anagram", "managra")) // true
 
-	// findTheDifference("abcd", "abcde") // 'e'
-	// findTheDifference("abcd", "abced") // 'e'
-	// findTheDifference("", "y")         // 'y'
+	fmt.Println(string(findTheDifference("abcd", "abcde"))) // 'e'
+	fmt.Println(string(findTheDifference("abcd", "abced"))) // 'e'
+	fmt.Println(string(findTheDifference("", "y")))         // 'y'
 
-	// canMakeArithmeticProgression([]int{1, 5, 3})    // true; 1, 3, 5 adalah baris aritmatik +2
-	// canMakeArithmeticProgression([]int{5, 1, 9})    // true; 9, 5, 1 adalah baris aritmatik -4
-	// canMakeArithmeticProgression([]int{1, 2, 4, 8}) // false; 1, 2, 4, 8 bukan baris aritmatik, melainkan geometrik x2
+	fmt.Println(canMakeArithmeticProgression([]int{1, 5, 3}))    // true; 1, 3, 5 adalah baris aritmatik +2
+	fmt.Println(canMakeArithmeticProgression([]int{5, 1, 9}))    // true; 9, 5, 1 adalah baris aritmatik -4
+	fmt.Println(canMakeArithmeticProgression([]int{1, 2, 4, 8})) // false; 1, 2, 4, 8 bukan baris aritmatik, melainkan geometrik x2
 
-	// tesDeck()
+	tesDeck()
 }
 
 // https://leetcode.com/problems/sign-of-the-product-of-an-array
 func arraySign(nums []int) int {
+<<<<<<< HEAD:basic_go/assignments/main.go
+	// write code here
+	sign := 1
+	for _, num := range nums {
+		if num == 0 {
+			return 0
+		}
+		if num < 0 {
+			sign *= -1
+		}
+	}
+
+	return sign
+=======
 	countNegatives := 0
 
 	for _, num := range nums {
@@ -41,26 +60,76 @@ func arraySign(nums []int) int {
 			return -1
 	}
 	return 1
+>>>>>>> b3e9bff036f3177ee65314059ffa2461baf666c9:assignments/main.go
 }
 
 
 // https://leetcode.com/problems/valid-anagram
 func isAnagram() bool {
 	// write code here
-	return false
+	if len(s) != len(t) {
+		return false
+	}
+	
+	charCount := make(map[rune]int)
+
+	for _, char := range s {
+		charCount[char]++
+	}
+
+	for _, char := range t {
+		if charCount[char] == 0 {
+			return false
+		}
+		charCount[char]--
+	}
+
+	for _, count := range charCount {
+		if count != 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
+<<<<<<< HEAD:basic_go/assignments/main.go
+	// https://leetcode.com/problems/find-the-difference
+func findTheDifference(s string, t string) byte {
+=======
 // https://leetcode.com/problems/find-the-difference
 func findTheDifference(_ string, t string) byte {
+>>>>>>> b3e9bff036f3177ee65314059ffa2461baf666c9:assignments/main.go
 	// write code here
-	b := byte('a')
-	return b
+	var result rune
+
+	for _, char := range s {
+		result ^= char
+	}
+	for _, char := range t {
+		result ^= char
+	}
+
+	return byte(result)
 }
 
-// https://leetcode.com/problems/can-make-arithmetic-progression-from-sequence
+	// https://leetcode.com/problems/can-make-arithmetic-progression-from-sequence
 func canMakeArithmeticProgression(arr []int) bool {
 	// write code here
-	return false
+	if len(arr) < 2 {
+		return true
+	}
+
+	sort.Ints(arr)
+	diff := arr[1] - arr[0]
+
+	for i := 2; i < len(arr); i++ {
+		if arr[i] - arr[i-1] != diff {
+			return false
+		}
+	}
+
+	return true
 }
 
 // Deck represent "standard" deck consist of 52 cards
@@ -79,18 +148,31 @@ type Card struct {
 // assume Ace-Spade on top of deck.
 func (d *Deck) New() {
 	// write code here
+	d.cards = make([]Card, 0, 52)
+	for symbol := 0; symbol < 4; symbol++ {
+		for number := 1; number <= 13; number++ {
+			d.cards = append(d.cards, Card{symbol: symbol, number: number})
+		}
+	}
 }
 
 // PeekTop return n cards from the top
 func (d Deck) PeekTop(n int) []Card {
 	// write code here
-	return nil
+	if n > len(d.cards) {
+		n = len(d.cards)
+	}
+	return d.cards[:n]
 }
 
 // PeekTop return n cards from the bottom
 func (d Deck) PeekBottom(n int) []Card {
 	// write code here
-	return nil
+	if n > len(d.cards) {
+		n = len(d.cards)
+	}
+
+	return d.cards[len(d.cards)-n:]
 }
 
 // PeekCardAtIndex return a card at specified index
@@ -101,12 +183,21 @@ func (d Deck) PeekCardAtIndex(idx int) Card {
 // Shuffle randomly shuffle the deck
 func (d *Deck) Shuffle() {
 	// write code here
+	rand.Seed(time.Now().UnixNano())
+	rand.Shuffle(len(d.cards), func(i, j int) {
+		d.cards[i], d.cards[j] = d.cards[j], d.cards[i]
+	})
 }
 
 // Cut perform single "Cut" technique. Move n top cards to bottom
 // e.g. Deck: [1, 2, 3, 4, 5]. Cut(3) resulting Deck: [4, 5, 1, 2, 3]
 func (d *Deck) Cut(n int) {
 	// write code here
+	if n > len(d.cards) {
+		n = len(d.cards)
+	}
+	
+	d.cards = append(d.cards[n:], d.cards[:n]...)
 }
 
 func (c Card) ToString() string {
