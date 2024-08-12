@@ -1,6 +1,3 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
 # Binaries for programs and plugins
 *.exe
 *.exe~
@@ -23,3 +20,45 @@ go.work.sum
 
 # env file
 .env
+
+# macOS specific files
+*.DS_Store
+
+# Windows specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# VS Code
+.vscode/
+
+# JetBrains IDEs (IntelliJ IDEA, PyCharm, WebStorm, etc.)
+.idea/
+*.iml
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# NetBeans
+nbproject/
+*.nb-gradle
+
+# Atom
+.atom/
+
+# Emacs
+*~
+\#*\#
+
+# Vim
+*.swp
+*.swo
+*.swn
+*.viminfo
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.pid
