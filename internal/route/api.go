@@ -1,8 +1,7 @@
 package route
 
 import (
-	integration "codebase-app/internal/integration/oauth2google"
-	restUser "codebase-app/internal/module/user/handler/rest"
+	handlerShop "codebase-app/internal/module/shop/handler/rest"
 	"codebase-app/pkg/response"
 
 	"github.com/gofiber/fiber/v2"
@@ -11,11 +10,10 @@ import (
 
 func SetupRoutes(app *fiber.App) {
 	var (
-		googleOauth = integration.NewOauth2googleIntegration()
-		api         = app.Group("/users")
+		api = app.Group("/products")
 	)
 
-	restUser.NewUserHandler(googleOauth).Register(api)
+	handlerShop.NewShopHandler().Register(api)
 
 	// fallback route
 	app.Use(func(c *fiber.Ctx) error {
