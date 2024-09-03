@@ -203,3 +203,7 @@ func (h *userHandler) callbackSigninGoogle(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusOK).JSON(response.Success(res, ""))
 }
+
+// Convert dari PRD ke user story
+// Jelaskan diagram dan alur based on user story
+// Jelaskan based on diagram
