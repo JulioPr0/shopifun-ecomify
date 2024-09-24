@@ -1,199 +1,337 @@
 package repository
 
 import (
-	"codebase-app/internal/common/utils"
-	"codebase-app/internal/module/product/entity"
 	"codebase-app/internal/module/product/ports"
+	"codebase-app/pkg/errmsg"
+	"database/sql"
+
+	"codebase-app/internal/module/product/entity"
 	"context"
 
 	"github.com/jmoiron/sqlx"
 	"github.com/rs/zerolog/log"
 )
 
-var _ ports.ProductRepository = &productRepository{}
-
 type productRepository struct {
 	db *sqlx.DB
 }
 
-func NewProductRepository(db *sqlx.DB) *productRepository {
+func NewProductRepository(db *sqlx.DB) ports.ProductRepository {
 	return &productRepository{
-		db: db,
+		db,
 	}
 }
 
-func (r *productRepository) GetProducts(ctx context.Context, req *entity.ProductsRequest) (*entity.ProductsResponse, error) {
-	type dao struct {
-		TotalData int `db:"total_data"`
-		entity.ProductItem
+func (p *productRepository) CreateProduct(ctx context.Context, req *entity.CreateProductRequest) (entity.UpsertProductResponse, error) {
+	var (
+		res entity.UpsertProductResponse
+	)
+
+	query := `
+		INSERT INTO
+			products (
+				shop_id,
+				category_id,
+				name,
+				description,
+				image_url,
+				price,
+				stock
+			)
+			VALUES ( $1, $2, $3, $4, $5, $6, $7 )
+			RETURNING
+				id, shop_id, name, description, image_url, price, stock, created_at, updated_at
+	`
+
+	err := p.db.QueryRowxContext(ctx, query,
+		req.ShopId,
+		req.CategoryId,
+		req.Name,
+		req.Description,
+		req.ImageUrl,
+		req.Price,
+		req.Stock,
+	).StructScan(&res)
+	if err != nil {
+		log.Error().Err(err).Any("payload", req).Msg("repository: CreateProduct failed")
+		return res, err
 	}
 
+	res.UserId = req.UserId
+	return res, nil
+}
+
+func (p *productRepository) GetProducts(ctx context.Context, req *entity.GetProductsRequest) (entity.GetProductsResponse, error) {
+	type dao struct {
+		TotalData int `db:"total_data"`
+		entity.Product
+	}
 	var (
-		resp   = new(entity.ProductsResponse)
-		data   = make([]dao, 0, req.Paginate)
-		params = []interface{}{}
+		res  entity.GetProductsResponse
+		data = make([]dao, 0)
+		arg  = make(map[string]any)
 	)
-	resp.Items = make([]entity.ProductItem, 0, req.Paginate)
+	res.Meta.Page = req.Page
+	res.Meta.Limit = req.Limit
 
 	query := `
 		SELECT
-			COUNT(id) OVER() as total_data,
-			id, name, description, price, stock, category_id
-		FROM products
+			COUNT(*) OVER() AS total_data,
+			id,
+			category_id,
+			shop_id,
+			name,
+			image_url,
+			price,
+			stock,
+			created_at,
+			updated_at
+		FROM
+			products
 		WHERE
 			deleted_at IS NULL
 	`
-	productsFilters(&query, &params, req)
-	utils.FieldOrderBy(&query, req.OrderBy, req.Sort, "name", "price", "stock", "created_at")
-	query += " LIMIT ? OFFSET ?"
-	params = append(params, req.Paginate, req.Paginate*(req.Page-1))
 
-	err := r.db.SelectContext(ctx, &data, r.db.Rebind(query), params...)
-	if err != nil {
-		log.Error().Err(err).Any("payload", req).Msg("repository::GetProducts - Failed to get products")
-		return nil, err
-	}
-
-	if len(data) > 0 {
-		resp.Meta.TotalData = data[0].TotalData
-	}
-
-	for _, d := range data {
-		resp.Items = append(resp.Items, d.ProductItem)
-	}
-
-	resp.Meta.CountTotalPage(req.Page, req.Paginate, resp.Meta.TotalData)
-
-	return resp, nil
-}
-
-func productsFilters(query *string, params *[]interface{}, req *entity.ProductsRequest) {
-	if req.ShopId != "" {
-		*query += " AND shop_id = ?"
-		*params = append(*params, req.ShopId)
-	}
-
-	if req.Name != "" {
-		*query += " AND name ILIKE ?"
-		*params = append(*params, "%"+req.Name+"%")
-	}
-
-	if req.MinPrice > 0 {
-		*query += " AND price >= ?"
-		*params = append(*params, req.MinPrice)
-	}
-
-	if req.MaxPrice > 0 {
-		*query += " AND price <= ?"
-		*params = append(*params, req.MaxPrice)
-	}
-
-	if req.IsAvailable != nil {
-		if *req.IsAvailable {
-			*query += " AND stock > 0"
-		} else if !*req.IsAvailable {
-			*query += " AND stock = 0"
+	if len(req.ProductIds) > 0 {
+		var ids string
+		for i, id := range req.ProductIds {
+			ids += "'" + id + "'"
+			if i < len(req.ProductIds)-1 {
+				ids += ", "
+			}
 		}
+		query += " AND id IN (" + ids + ")"
+	}
+
+	if req.ShopId != "" {
+		query += " AND shop_id = :shop_id"
+		arg["shop_id"] = req.ShopId
 	}
 
 	if req.CategoryId != "" {
-		*query += " AND category_id = ?"
-		*params = append(*params, req.CategoryId)
+		query += " AND category_id = :category_id"
+		arg["category_id"] = req.CategoryId
 	}
+
+	if req.Name != "" {
+		query += " AND name ILIKE '%' || :name || '%'"
+		arg["name"] = req.Name
+	}
+
+	if req.PriceMinStr != "" {
+		query += " AND price >= :price_min"
+		arg["price_min"] = req.PriceMin
+	}
+
+	if req.PriceMaxStr != "" {
+		query += " AND price <= :price_max"
+		arg["price_max"] = req.PriceMax
+	}
+
+	if req.IsAvailable {
+		query += " AND stock > 0"
+	}
+
+	query += `
+		ORDER BY created_at DESC
+		LIMIT :limit
+		OFFSET :offset
+	`
+	arg["limit"] = req.Limit
+	arg["offset"] = (req.Page - 1) * req.Limit
+
+	nstmt, err := p.db.PrepareNamedContext(ctx, query)
+	if err != nil {
+		log.Error().Err(err).Any("payload", req).Msg("repository: GetProducts failed")
+		return res, err
+	}
+	defer nstmt.Close()
+
+	err = nstmt.SelectContext(ctx, &data, arg)
+	if err != nil {
+		log.Error().Err(err).Any("payload", req).Msg("repository: GetProducts failed")
+		return res, err
+	}
+
+	for _, d := range data {
+		res.Items = append(res.Items, entity.Product{
+			Id:         d.Id,
+			CategoryId: d.CategoryId,
+			ShopId:     d.ShopId,
+			Name:       d.Name,
+			ImageUrl:   d.ImageUrl,
+			Price:      d.Price,
+			Stock:      d.Stock,
+			CreatedAt:  d.CreatedAt,
+			UpdatedAt:  d.UpdatedAt,
+		})
+
+		res.Meta.TotalData = d.TotalData
+	}
+
+	res.Meta.CountTotalPage()
+	return res, nil
 }
 
-func (r *productRepository) GetProduct(ctx context.Context, req *entity.GetProductRequest) (*entity.GetProductResponse, error) {
+func (p *productRepository) UpdateProduct(ctx context.Context, req *entity.UpdateProductRequest) (entity.UpsertProductResponse, error) {
 	var (
-		resp = new(entity.GetProductResponse)
+		res entity.UpsertProductResponse
 	)
+
 	query := `
-		SELECT
-			p.name,
-			p.description,
-			p.price,
-			p.stock,
-			c.name AS "category.name",
-			c.description AS "category.description"
-		FROM 
-			products p
-		JOIN 
-			categories c ON p.category_id = c.id
+		UPDATE
+			products
+		SET
+			category_id = $1,
+			name = $2,
+			description = $3,
+			image_url = $4,
+			price = $5,
+			stock = $6,
+			updated_at = NOW()
 		WHERE
-			p.deleted_at IS NULL
-			AND c.deleted_at IS NULL
-			AND p.id = ?
-	`
-	err := r.db.GetContext(ctx, resp, r.db.Rebind(query), req.Id)
-	if err != nil {
-		log.Error().Err(err).Any("payload", req).Msg("repository::GetProduct - Failed to get product and category")
-		return nil, err
-	}
-
-	resp.CategoryId = nil
-	return resp, nil
-}
-
-func (r *productRepository) CreateProduct(ctx context.Context, req *entity.CreateProductRequest) (*entity.CreateProductResponse, error) {
-	var resp = new(entity.CreateProductResponse)
-	query := `
-		INSERT INTO products (shop_id, name, description, price, stock, category_id)
-		VALUES (?, ?, ?, ?, ?, ?)
-		RETURNING id
+			id = $7
+			AND deleted_at IS NULL
+		RETURNING
+			id, shop_id, name, description, image_url, price, stock, created_at, updated_at
 	`
 
-	err := r.db.QueryRowContext(ctx, r.db.Rebind(query),
-		req.ShopId,
+	err := p.db.QueryRowxContext(ctx, query,
+		req.CategoryId,
 		req.Name,
 		req.Description,
+		req.ImageUrl,
 		req.Price,
 		req.Stock,
-		req.CategoryId,
-	).Scan(&resp.Id)
-	if err != nil {
-		log.Error().Err(err).Any("payload", req).Msg("repository::CreateProduct - Failed to create product")
-		return nil, err
-	}
-
-	return resp, nil
-}
-
-func (r *productRepository) UpdateProduct(ctx context.Context, req *entity.UpdateProductRequest) (*entity.UpdateProductResponse, error) {
-	var resp = new(entity.UpdateProductResponse)
-	query := `
-		UPDATE products
-		SET name = ?, description = ?, price = ?, stock = ?, category_id = ?
-		WHERE id = ?
-		RETURNING id
-	`
-
-	err := r.db.QueryRowContext(ctx, r.db.Rebind(query),
-		req.Name,
-		req.Description,
-		req.Price,
-		req.Stock,
-		req.CategoryId,
 		req.Id,
-	).Scan(&resp.Id)
+	).StructScan(&res)
 	if err != nil {
-		log.Error().Err(err).Any("payload", req).Msg("repository::UpdateProduct - Failed to update product")
-		return nil, err
+		if err == sql.ErrNoRows {
+			log.Warn().Any("payload", req).Msg("repository: Product not found")
+			return res, errmsg.NewCustomErrors(404, errmsg.WithMessage("Product not found"))
+		}
+		log.Error().Err(err).Any("payload", req).Msg("repository: UpdateProduct failed")
+		return res, err
 	}
 
-	return resp, nil
+	res.UserId = req.UserId
+	return res, nil
 }
+func (p *productRepository) UpdateProductStock(ctx context.Context, req *entity.UpdateProductStockRequest) error {
+	tx, err := p.db.BeginTxx(ctx, nil)
+	if err != nil {
+		log.Error().Err(err).Any("payload", req).Msg("repository: UpdateProductStock failed")
+		return err
+	}
+	defer tx.Rollback()
 
-func (r *productRepository) DeleteProduct(ctx context.Context, req *entity.DeleteProductRequest) error {
 	query := `
-		UPDATE products
-		SET deleted_at = NOW()
-		WHERE id = ?
+		UPDATE
+			products
+		SET
+			stock = :stock
+		WHERE
+			id = :id
 	`
 
-	_, err := r.db.ExecContext(ctx, r.db.Rebind(query), req.Id)
+	for _, item := range req.Items {
+		arg := map[string]any{
+			"id":    item.ProductId,
+			"stock": item.Stock,
+		}
+
+		_, err = tx.NamedExec(query, arg)
+		if err != nil {
+			log.Error().Err(err).Any("payload", req).Msg("repository: UpdateProductStock failed")
+			return err
+		}
+	}
+
+	err = tx.Commit()
 	if err != nil {
-		log.Error().Err(err).Any("payload", req).Msg("repository::DeleteProduct - Failed to delete product")
+		log.Error().Err(err).Any("payload", req).Msg("repository: UpdateProductStock failed")
 		return err
 	}
 
 	return nil
+}
+
+func (p *productRepository) DeleteProduct(ctx context.Context, req *entity.DeleteProductRequest) error {
+	query := `
+	UPDATE products
+		SET deleted_at = NOW()
+	WHERE
+		id = $1
+	`
+
+	_, err := p.db.ExecContext(ctx, query, req.ProductId)
+	if err != nil {
+		log.Error().Err(err).Any("payload", req).Msg("repository: DeleteProduct failed")
+		return err
+	}
+
+	return nil
+}
+
+func (p *productRepository) IsShopOwner(ctx context.Context, userId, shopId string) (bool, error) {
+	var (
+		isOwner bool
+		payload = struct {
+			UserId string `json:"user_id"`
+			ShopId string `json:"shop_id"`
+		}{userId, shopId}
+	)
+
+	query := `
+		SELECT
+			EXISTS (
+				SELECT 1
+				FROM
+					shops
+				WHERE
+					user_id = $1
+					AND id = $2
+					AND deleted_at IS NULL
+			)
+	`
+
+	err := p.db.GetContext(ctx, &isOwner, query, userId, shopId)
+	if err != nil {
+		log.Error().Err(err).Any("payload", payload).Msg("repository: IsShopOwner failed")
+		return isOwner, err
+	}
+
+	return isOwner, nil
+}
+
+func (p *productRepository) IsProductOwner(ctx context.Context, userId, productId string) (bool, error) {
+	var (
+		isOwner bool
+		payload = struct {
+			UserId    string `json:"user_id"`
+			ProductId string `json:"product_id"`
+		}{userId, productId}
+	)
+
+	query := `
+		SELECT
+			EXISTS (
+				SELECT 1
+				FROM
+					products
+				LEFT JOIN
+					shops ON products.shop_id = shops.id
+				WHERE
+					shops.user_id = $1
+					AND products.id = $2
+			)
+	`
+
+	err := p.db.GetContext(ctx, &isOwner, query, userId, productId)
+	if err != nil {
+		log.Error().Err(err).Any("payload", payload).Msg("repository: IsProductOwner failed")
+		return isOwner, err
+	}
+
+	return isOwner, nil
 }
